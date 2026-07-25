@@ -12,10 +12,12 @@ calibrated to that scale rather than treated as production-service gaps.
 - No CI/CD: deploys are manual (`npx cdk deploy`) from a developer machine.
   There's no automated build/lint/test/synth gate before a change reaches
   production.
-- `lambda/workingDays.ts` and `lambda/email.ts` have a Jest unit-test suite
-  (`npm test`), but the CDK stack itself has no snapshot/assertions test,
-  so an accidental IAM or schedule regression in `lib/retirement-countdown-stack.ts`
-  wouldn't be caught automatically.
+- `lambda/workingDays.ts`, `lambda/email.ts`, and `lambda/holidays.ts` have a
+  Jest unit-test suite (`npm test`), but `bin/manage-holidays.ts` (the CLI)
+  and the CDK stack itself have no automated tests, so an accidental IAM or
+  schedule regression in `lib/retirement-countdown-stack.ts`, or a CLI
+  argument-parsing bug, wouldn't be caught automatically — matching the
+  existing pattern where `bin/retirement-countdown.ts` is also untested.
 - Logging exists (default Lambda → CloudWatch Logs) but log retention is
   unset, so `NodejsFunction`'s default log group keeps logs indefinitely.
 - The single `CountdownFunctionName` CfnOutput is the only operational
@@ -45,8 +47,13 @@ calibrated to that scale rather than treated as production-service gaps.
   but it can no longer send as an *arbitrary* verified identity in the
   account, which is the scoping SES actually supports.
 - **Bedrock and DynamoDB grants are correctly least-privilege**: Bedrock is
-  scoped to a single model ARN; DynamoDB uses CDK's `grantReadWriteData`,
-  scoped to the one table.
+  scoped to a single model ARN. Of the two DynamoDB tables, `JokeHistoryTable`
+  uses `grantReadWriteData` (the Lambda both reads and writes joke history);
+  `BookedHolidaysTable` uses `grantReadData` only — the Lambda never writes
+  booked holidays, so a compromised or buggy execution context cannot alter
+  the holiday calendar, only read it. All holiday mutation happens via
+  `bin/manage-holidays.ts`, run locally under a human's own AWS credentials,
+  outside the Lambda's execution role entirely.
 - No VPC / network isolation is needed or used — correct call, since the
   function only calls AWS service APIs and has no need to reach private
   network resources.
@@ -75,7 +82,7 @@ calibrated to that scale rather than treated as production-service gaps.
   forward.
 - Validate `retirementDate` is a well-formed ISO date in the CDK app
   (`bin/retirement-countdown.ts`) — alongside the existing presence check —
-  so a typo fails at `cdk synth`/`deploy` time, not at 07:00 UTC the next
+  so a typo fails at `cdk synth`/`deploy` time, not at 06:00 UTC the next
   morning.
 
 ## 3. Reliability

@@ -9,7 +9,8 @@
 
 A serverless AWS application that emails a daily retirement countdown, complete
 with an AI-generated joke that gets progressively more unhinged as the date
-approaches. Built with AWS CDK (TypeScript).
+approaches, and a **F**ks-to-Give Meter** that craters toward zero on the
+same schedule. Built with AWS CDK (TypeScript).
 
 Every morning at 06:00 UTC, a Lambda function calculates the number of
 **working days** left until a configured retirement date, asks Amazon
@@ -17,6 +18,14 @@ Bedrock (Claude) for a short joke matching the mood of that countdown
 stage, and emails the result via Amazon SES. Recent jokes are kept in
 DynamoDB so the model avoids repeating itself, and a CloudWatch alarm
 emails a separate ops alert if a run fails.
+
+The email also carries a second meter alongside the progress bar: a
+**F**ks-to-Give %**, which starts near 100% while retirement is far off and
+decays exponentially toward 0% as the date approaches (still trying today,
+running on autopilot by the end). It's a pure function of days remaining —
+see `fucksToGivePct` in [lambda/email.ts](lambda/email.ts) — and its current
+reading is also fed into the Bedrock prompt so the joke's attitude can track
+it alongside the existing countdown-stage tone.
 
 "Working days" excludes weekends, England & Wales bank holidays, the
 Christmas Day–New Year's Day closure period, a fortnightly non-working
@@ -28,7 +37,7 @@ for the exact rules.
 
 ```mermaid
 flowchart LR
-    EB[EventBridge<br/>cron 07:00 UTC] --> L[Lambda<br/>CountdownFunction]
+    EB[EventBridge<br/>cron 06:00 UTC] --> L[Lambda<br/>CountdownFunction]
     L --> BR[Bedrock<br/>Claude model]
     L --> DDB[(DynamoDB<br/>JokeHistoryTable)]
     L --> SES[SES]
@@ -134,9 +143,11 @@ npm test
 ```
 
 Covers the working-day calculation (`lambda/workingDays.ts`: UK bank
-holidays, Christmas closure, the fortnightly Friday, day counting) and the
-email rendering (`lambda/email.ts`: stage/tone selection, progress bar,
-HTML/text output).
+holidays, Christmas closure, the fortnightly Friday, booked holidays, day
+counting), booked-holiday storage (`lambda/holidays.ts`: add/remove/list
+against a mocked DynamoDB table), and email rendering (`lambda/email.ts`:
+stage/tone selection, progress bar, the F**ks-to-Give meter, HTML/text
+output).
 
 ## Test it immediately
 
@@ -147,7 +158,7 @@ cat out.json
 
 ## Notes
 
-- **DST**: the schedule is fixed at 07:00 UTC (08:00 BST / 07:00 GMT). It
+- **DST**: the schedule is fixed at 06:00 UTC (07:00 BST / 06:00 GMT). It
   won't auto-shift with daylight saving — adjust the cron in
   `lib/retirement-countdown-stack.ts` if exact local time matters year-round.
 - **Joke history**: stored in DynamoDB so the prompt can tell Bedrock what

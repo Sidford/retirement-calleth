@@ -12,9 +12,11 @@ multi-tenant or internet-facing service.
 |---|---|---|
 | Verified SES sender identity | Medium | Reputation asset — abuse could get the sending domain/address flagged as spam |
 | Recipient / sender email addresses | Low (PII) | Personal but not sensitive (financial/health) data |
-| Lambda execution role credentials | Medium | Scoped IAM permissions to DynamoDB (one table), Bedrock (one model), SES (sender identity ARN) |
+| Lambda execution role credentials | Medium | Scoped IAM permissions to DynamoDB (`JokeHistoryTable` read/write, `BookedHolidaysTable` read-only), Bedrock (one model), SES (sender identity ARN) |
 | Joke history (DynamoDB) | Low | No sensitive content; regenerable |
 | Retirement date | Low | Personal but not sensitive |
+| Booked holiday dates (DynamoDB) | Low (PII) | Reveals a personal absence pattern; not financial/health-sensitive, comparable to the retirement date itself |
+| Human operator's local AWS credentials (`AWS_PROFILE`) | Medium | Used directly by `bin/manage-holidays.ts` to write/delete holiday bookings — not scoped to this stack; whatever the profile grants elsewhere in the account is in play |
 | Bedrock/SES usage (cost) | Low | Small per-invocation cost; abuse ceiling is low but non-zero |
 
 ## Trust boundaries
@@ -24,26 +26,31 @@ flowchart TB
     subgraph AWS["AWS Account (single account/region)"]
         EB[EventBridge Rule]
         L[Lambda: CountdownFunction]
-        DDB[(DynamoDB)]
+        DDB[(DynamoDB: JokeHistoryTable<br/>read/write)]
+        HDDB[(DynamoDB: BookedHolidaysTable<br/>read-only from Lambda)]
         BR[Bedrock Runtime]
         CW[CloudWatch Alarm]
         SNS[SNS Topic]
         subgraph IAM["IAM principals"]
             Role[Lambda execution role]
-            Human[Human operators w/ console access]
+            Human[Human operator: local AWS_PROFILE]
         end
     end
     SES[SES — sends outside AWS account boundary]
     Internet((Public internet<br/>recipient mail server))
+    CLI[bin/manage-holidays.ts<br/>runs on operator's machine]
 
     EB -->|trusted, in-account| L
-    L -->|scoped IAM| DDB
+    L -->|scoped IAM: read/write| DDB
+    L -->|scoped IAM: read-only| HDDB
     L -->|scoped IAM| BR
     L -->|scoped IAM: sender identity ARN| SES
     SES -->|SMTP/internet| Internet
     CW --> SNS --> Internet
     Human -.->|can invoke/modify| L
     Role -.->|assumed by| L
+    Human -->|runs, using own credentials| CLI
+    CLI -->|read/write: add/remove holidays| HDDB
 ```
 
 Key boundary crossings:
@@ -59,6 +66,12 @@ Key boundary crossings:
    this role can send email *as that specific verified identity* — but
    still to any recipient address, since SES has no resource-level ARN for
    the destination (see T1).
+5. **Human operator → `bin/manage-holidays.ts` → `BookedHolidaysTable`**: a
+   trust boundary the Lambda is *not* part of. The CLI runs outside AWS
+   entirely (a developer's machine) and writes/deletes holiday bookings
+   using whatever the operator's own `AWS_PROFILE` grants — not the
+   Lambda's scoped execution role. The Lambda only ever reads from this
+   table (see [T14](#tampering)).
 
 ## Threats by STRIDE category
 
@@ -108,6 +121,17 @@ Key boundary crossings:
   `bedrockModelId`. Acceptable for a single-owner personal repo; would
   need branch protection + required review if the repo gains
   collaborators.
+- **T14 — Booked-holiday tampering via the CLI's own AWS credentials.**
+  `bin/manage-holidays.ts` writes/deletes items in `BookedHolidaysTable`
+  using whatever `AWS_PROFILE` the operator has active — not a scoped
+  role, but the operator's full local credentials. Anyone who can run the
+  CLI (i.e., anyone with the operator's AWS access) can add, remove, or
+  overwrite any booked holiday, silently changing the countdown's working-
+  day math. Impact is low (worst case: a wrong day count in an email to
+  yourself) and the Lambda side stays unaffected since it only reads (see
+  trust-boundary crossing 5). No action needed at this scale; the natural
+  mitigation would be tightening the operator's own IAM/credential
+  hygiene, which is outside this stack's scope.
 
 ### Repudiation
 
@@ -157,14 +181,19 @@ Key boundary crossings:
 
 ### Elevation of Privilege
 
-- **T12 — Execution-role scope is now tight across all three grants.**
-  DynamoDB and Bedrock grants are scoped to specific resources
-  (`grantReadWriteData` on one table; `bedrock:InvokeModel` on one model
-  ARN), and the SES grant is scoped to the sender identity ARN (T1) rather
-  than `resources: ["*"]`. The residual gap — a compromised execution
-  context can still send to any recipient as this one identity, since SES
-  has no destination-side ARN — is noted in T1 as optional further
-  hardening, not an open elevation-of-privilege path across identities.
+- **T12 — Execution-role scope is tight across all four grants.**
+  Both DynamoDB tables and the Bedrock grant are scoped to specific
+  resources (`grantReadWriteData` on `JokeHistoryTable`; `grantReadData`
+  only on `BookedHolidaysTable`, notably not read/write; `bedrock:InvokeModel`
+  on one model ARN), and the SES grant is scoped to the sender identity ARN
+  (T1) rather than `resources: ["*"]`. The read-only holidays grant means a
+  compromised Lambda execution context cannot use its own role to write
+  holiday data — it would have to reach the operator's separate local
+  credentials (T14) to do that, a materially higher bar. The residual gap —
+  a compromised execution context can still send to any recipient as this
+  one SES identity, since SES has no destination-side ARN — is noted in T1
+  as optional further hardening, not an open elevation-of-privilege path
+  across identities.
 - **T13 — No resource-based policy restricting who can invoke the
   Lambda beyond the EventBridge rule.** By default, only principals
   explicitly granted `lambda:InvokeFunction` (the EventBridge rule, plus
@@ -180,6 +209,7 @@ Key boundary crossings:
 | T9 | Real email addresses in committed source | — | — | **Fixed** |
 | T7/T8 | Low-sensitivity PII visible via logs/env vars to in-account principals | Low | Low | Low |
 | T10/T11 | Cost abuse or throttling of a once-daily job | Low | Low | Low |
+| T14 | Booked-holiday tampering via CLI/operator credentials | Low | Low | Low |
 | T3/T5/T6/T13 | Standard IAM-default-deny behavior already mitigates these | — | — | No action |
 
 ## Recommended actions, in order

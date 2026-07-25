@@ -12,9 +12,10 @@ ops-error alert).
 
 | Component | AWS Service | Purpose |
 |---|---|---|
-| `DailyScheduleRule` | Amazon EventBridge (Scheduler rule) | Cron trigger, `07:00 UTC` daily, invokes the Lambda |
-| `CountdownFunction` | AWS Lambda (Node.js 20.x, `NodejsFunction`) | Computes days remaining, calls Bedrock, sends email, reads/writes DynamoDB |
+| `DailyScheduleRule` | Amazon EventBridge (Scheduler rule) | Cron trigger, `06:00 UTC` daily, invokes the Lambda |
+| `CountdownFunction` | AWS Lambda (Node.js 20.x, `NodejsFunction`) | Computes days remaining (net of booked holidays), calls Bedrock, sends email, reads/writes DynamoDB |
 | `JokeHistoryTable` | Amazon DynamoDB | Stores recent joke text (rolling list, key `HISTORY`) plus one dated record per day (90-day TTL) |
+| `BookedHolidaysTable` | Amazon DynamoDB | Stores individually booked holiday dates, managed via `bin/manage-holidays.ts` (not by the Lambda — see [State](#state) and [IAM](#iam)) |
 | Bedrock invocation | Amazon Bedrock Runtime (`InvokeModel`) | Generates the joke text via a Claude foundation model |
 | Email delivery | Amazon SES (`SendEmail`) | Sends the daily countdown email to the recipient |
 | `FunctionErrorAlarm` | Amazon CloudWatch Alarm | Fires when the Lambda reports ≥1 error in a day |
@@ -26,18 +27,22 @@ ops-error alert).
 sequenceDiagram
     participant EB as EventBridge
     participant L as Lambda (CountdownFunction)
+    participant HDDB as DynamoDB (BookedHolidaysTable)
     participant DDB as DynamoDB (JokeHistoryTable)
     participant BR as Bedrock (Claude)
     participant SES as SES
     participant U as Recipient
 
-    EB->>L: scheduled invoke (07:00 UTC)
+    EB->>L: scheduled invoke (06:00 UTC)
+    L->>HDDB: Query(type=holiday, date BETWEEN today AND retirementDate)
+    HDDB-->>L: booked holiday dates[]
     L->>L: compute working days left (see "Working-day calculation")
+    L->>L: compute F**ks-to-Give % (exponential decay by days remaining)
     L->>DDB: GetItem(date=HISTORY)
     DDB-->>L: recent jokes[]
-    L->>BR: InvokeModel(system+user prompt, tone by days remaining)
+    L->>BR: InvokeModel(system+user prompt, tone + F**ks-to-Give % by days remaining)
     BR-->>L: joke text
-    L->>SES: SendEmail(subject, joke body)
+    L->>SES: SendEmail(subject, joke body + progress bar + F**ks-to-Give meter)
     SES-->>U: countdown email
     L->>DDB: PutItem(HISTORY, jokes[-10:])
     L->>DDB: PutItem(date=YYYY-MM-DD, joke, ttl=+90d)
@@ -83,6 +88,14 @@ apply:
    non-working Friday, passed in as `nonWorkingFridayAnchor` context —
    see [Configuration](#configuration)); the pattern alternates every 7
    days from that anchor in both directions.
+5. **Booked holiday** — an individually registered date, stored in
+   `BookedHolidaysTable` and managed via `bin/manage-holidays.ts` (`add`,
+   `range`, `remove`, `remove-range`, `list`). The Lambda queries all
+   booked holidays between today and `RETIREMENT_DATE` on every invocation
+   (`getBookedHolidays` in `lambda/holidays.ts`) and passes them into
+   `workingDaysUntilRetirement` as a `Set<number>` of UTC millisecond
+   timestamps, so a booking made via the CLI is reflected in the very next
+   scheduled email with no additional propagation step.
 
 The bank-holiday and Easter calculations are pure, dependency-free
 functions (no external calendar API), verified against the published
@@ -90,6 +103,29 @@ gov.uk bank holiday lists for 2026–2028 in `lambda/workingDays.test.ts`.
 One-off bank holidays outside the normal rule set (e.g. a state funeral or
 coronation) aren't and can't be predicted algorithmically — they'd need a
 manual override if one is ever announced during the countdown.
+
+## Email content
+
+Beyond the working-day count and Bedrock-generated joke, `lambda/email.ts`
+computes two derived, presentation-only values from `days` (working days
+remaining) and renders both the HTML and plaintext email bodies:
+
+- **Progress bar** (`progressPct`) — linear, calendar-day-based percentage
+  of the way from `COUNTDOWN_START_DATE` to `RETIREMENT_DATE`. Cosmetic
+  only; does not affect the working-day count.
+- **F**ks-to-Give meter** (`fucksToGivePct`) — an exponential *saturation*
+  curve, `100 * (1 - e^(-days / 30))`, driven by working days remaining
+  (the same `days` value, not calendar days). It sits near 100% while
+  retirement is hundreds of days out, then craters through the final
+  weeks as `days` shrinks toward zero (≈96% at 100 days, ≈63% at 30,
+  ≈21% at 7, ≈3% at 1, 0% on the day). Its current reading is also passed
+  into the Bedrock prompt (`generateJoke` in `lambda/handler.ts`) as
+  additional tone context alongside the countdown-stage tone from
+  `stageForDays`, so the generated joke's attitude can track both.
+
+Both functions are pure (no I/O), unit-tested in `lambda/email.test.ts`,
+and require no additional DynamoDB state — the meter's decay constant
+(`30`) is a hardcoded tuning value, not configuration.
 
 ## Compute and packaging
 
@@ -118,6 +154,17 @@ The table has `RemovalPolicy.DESTROY`, so `cdk destroy` deletes all history
 along with the stack — acceptable given the data is low-value and
 regenerable.
 
+`BookedHolidaysTable` (DynamoDB, on-demand billing) uses a partition key
+`type` and sort key `date`:
+
+- `type = "holiday"`, `date = "YYYY-MM-DD"` — one item per booked date, plus
+  an `addedAt` timestamp. The sort key enables the `Query` with
+  `date BETWEEN :start AND :end` that `getBookedHolidays` uses to fetch only
+  the dates relevant to the current countdown window.
+
+This table also has `RemovalPolicy.DESTROY`. Unlike `JokeHistoryTable`, the
+Lambda never writes to it — see [IAM](#iam).
+
 ## Configuration
 
 Stack props (`RetirementCountdownStackProps`) are resolved in
@@ -125,7 +172,8 @@ Stack props (`RetirementCountdownStackProps`) are resolved in
 plain (unencrypted-beyond-default) environment variables:
 
 - `RETIREMENT_DATE`, `SENDER_EMAIL`, `RECIPIENT_EMAIL`, `BEDROCK_MODEL_ID`,
-  `COUNTDOWN_START_DATE`, `NON_WORKING_FRIDAY_ANCHOR`, `TABLE_NAME`.
+  `COUNTDOWN_START_DATE`, `NON_WORKING_FRIDAY_ANCHOR`, `TABLE_NAME`,
+  `HOLIDAYS_TABLE_NAME`.
 
 `retirementDate`, `senderEmail`, `recipientEmail`, and
 `nonWorkingFridayAnchor` are personal data, so they are **not** hardcoded
@@ -149,6 +197,12 @@ where possible:
 
 - `jokeHistoryTable.grantReadWriteData(countdownFn)` — read/write limited to
   the one table.
+- `holidaysTable.grantReadData(countdownFn)` — **read-only**. The Lambda
+  never writes booked holidays; all mutation goes through
+  `bin/manage-holidays.ts`, run by a human under their own AWS credentials
+  (`AWS_PROFILE`), not the Lambda's execution role. This means a compromised
+  or buggy Lambda invocation cannot alter the holiday calendar, only read
+  from it — a deliberate asymmetry versus `JokeHistoryTable`.
 - `bedrock:InvokeModel` — restricted to the specific model. For a
   cross-region inference profile id (`eu.`/`us.`/`apac.`/`global.` prefix),
   the grant covers both the inference-profile ARN and the underlying
