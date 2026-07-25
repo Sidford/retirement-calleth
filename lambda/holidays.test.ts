@@ -1,4 +1,11 @@
-import { getBookedHolidays, addHoliday, addHolidayRange, listHolidays } from "./holidays";
+import {
+  getBookedHolidays,
+  addHoliday,
+  addHolidayRange,
+  removeHoliday,
+  removeHolidayRange,
+  listHolidays,
+} from "./holidays";
 
 // Mock DynamoDB: an in-memory table of { type, date, addedAt } items, driven by
 // the Put/Query commands the implementation actually issues.
@@ -21,16 +28,22 @@ jest.mock("@aws-sdk/lib-dynamodb", () => {
       this.input = input;
     }
   }
-  class GetCommand {
+  class DeleteCommand {
     input: any;
     constructor(input: any) {
       this.input = input;
     }
   }
 
-  const send = jest.fn(async (command: PutCommand | QueryCommand | GetCommand) => {
+  const send = jest.fn(async (command: PutCommand | QueryCommand | DeleteCommand) => {
     if (command instanceof PutCommand) {
       store.push(command.input.Item);
+      return {};
+    }
+
+    if (command instanceof DeleteCommand) {
+      const { type, date } = command.input.Key;
+      store = store.filter((item) => !(item.type === type && item.date === date));
       return {};
     }
 
@@ -56,7 +69,7 @@ jest.mock("@aws-sdk/lib-dynamodb", () => {
     },
     PutCommand,
     QueryCommand,
-    GetCommand,
+    DeleteCommand,
   };
 });
 
@@ -90,5 +103,28 @@ describe("Holiday Management", () => {
     await addHolidayRange("2026-08-10", "2026-08-12");
     const holidays = await getBookedHolidays("2026-08-01", "2026-08-31");
     expect(holidays.size).toBe(3);
+  });
+
+  it("removes a single holiday", async () => {
+    await addHoliday("2026-08-15");
+    await removeHoliday("2026-08-15");
+    const holidays = await listHolidays();
+    expect(holidays).not.toContain("2026-08-15");
+  });
+
+  it("removes a holiday range", async () => {
+    await addHolidayRange("2026-08-15", "2026-08-17");
+    await removeHolidayRange("2026-08-15", "2026-08-16");
+    const holidays = await listHolidays();
+    expect(holidays).not.toContain("2026-08-15");
+    expect(holidays).not.toContain("2026-08-16");
+    expect(holidays).toContain("2026-08-17");
+  });
+
+  it("removing a holiday that was never booked is a no-op", async () => {
+    await addHoliday("2026-08-15");
+    await removeHoliday("2026-09-01");
+    const holidays = await listHolidays();
+    expect(holidays).toEqual(["2026-08-15"]);
   });
 });

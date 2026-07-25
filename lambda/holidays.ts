@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, DeleteCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const TABLE_NAME = process.env.HOLIDAYS_TABLE_NAME as string;
@@ -56,6 +56,33 @@ export async function addHolidayRange(startDate: string, endDate: string): Promi
       new PutCommand({
         TableName: TABLE_NAME,
         Item: { type: "holiday", date: iso, addedAt: now },
+      })
+    );
+    current = addDays(current, 1);
+  }
+}
+
+/** Remove a single booked holiday */
+export async function removeHoliday(date: string): Promise<void> {
+  await ddb.send(
+    new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: { type: "holiday", date },
+    })
+  );
+}
+
+/** Remove a range of booked holidays (inclusive) */
+export async function removeHolidayRange(startDate: string, endDate: string): Promise<void> {
+  let current = parseIsoDateUtc(startDate);
+  const end = parseIsoDateUtc(endDate);
+
+  while (current.getTime() <= end.getTime()) {
+    const iso = dateToIso(current);
+    await ddb.send(
+      new DeleteCommand({
+        TableName: TABLE_NAME,
+        Key: { type: "holiday", date: iso },
       })
     );
     current = addDays(current, 1);
