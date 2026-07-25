@@ -4,6 +4,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { stageForDays, progressPct, renderEmail } from "./email";
 import { workingDaysUntilRetirement } from "./workingDays";
+import { getBookedHolidays } from "./holidays";
 
 const bedrock = new BedrockRuntimeClient({});
 const ses = new SESClient({});
@@ -19,8 +20,13 @@ const NON_WORKING_FRIDAY_ANCHOR = process.env.NON_WORKING_FRIDAY_ANCHOR as strin
 const HISTORY_KEY = "HISTORY";
 const MAX_HISTORY = 10;
 
-function daysLeft(): number {
-  return workingDaysUntilRetirement(RETIREMENT_DATE, NON_WORKING_FRIDAY_ANCHOR);
+async function daysLeft(bookedHolidays: Set<number>): Promise<number> {
+  return workingDaysUntilRetirement(
+    RETIREMENT_DATE,
+    NON_WORKING_FRIDAY_ANCHOR,
+    new Date(),
+    bookedHolidays
+  );
 }
 
 async function getRecentJokes(): Promise<string[]> {
@@ -95,7 +101,15 @@ async function sendEmail(days: number, joke: string): Promise<void> {
 }
 
 export async function handler(): Promise<void> {
-  const days = daysLeft();
+  const today = new Date();
+  const retirementDate = new Date(`${RETIREMENT_DATE}T00:00:00Z`);
+
+  const bookedHolidays = await getBookedHolidays(
+    today.toISOString().slice(0, 10),
+    RETIREMENT_DATE
+  );
+
+  const days = await daysLeft(bookedHolidays);
   const recentJokes = await getRecentJokes();
   const joke = await generateJoke(days, recentJokes);
 
