@@ -39,6 +39,13 @@ export class RetirementCountdownStack extends cdk.Stack {
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
+    const holidaysTable = new dynamodb.Table(this, "BookedHolidaysTable", {
+      partitionKey: { name: "type", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "date", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
     const countdownFn = new lambda.NodejsFunction(this, "CountdownFunction", {
       entry: path.join(__dirname, "../lambda/handler.ts"),
       handler: "handler",
@@ -53,10 +60,12 @@ export class RetirementCountdownStack extends cdk.Stack {
         COUNTDOWN_START_DATE: props.countdownStartDate,
         NON_WORKING_FRIDAY_ANCHOR: props.nonWorkingFridayAnchor,
         TABLE_NAME: jokeHistoryTable.tableName,
+        HOLIDAYS_TABLE_NAME: holidaysTable.tableName,
       },
     });
 
     jokeHistoryTable.grantReadWriteData(countdownFn);
+    holidaysTable.grantReadData(countdownFn);
 
     // A cross-region inference profile id is prefixed with its geo scope
     // (e.g. "eu."/"us."/"apac."/"global."). Invoking through a profile requires
