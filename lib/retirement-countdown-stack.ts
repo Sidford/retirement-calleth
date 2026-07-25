@@ -128,5 +128,11 @@ export class RetirementCountdownStack extends cdk.Stack {
     new cdk.CfnOutput(this, "CountdownFunctionName", {
       value: countdownFn.functionName,
     });
+
+    // Needed by bin/manage-holidays.ts, which runs outside the Lambda and so
+    // doesn't get HOLIDAYS_TABLE_NAME injected via the environment block above.
+    new cdk.CfnOutput(this, "BookedHolidaysTableName", {
+      value: holidaysTable.tableName,
+    });
   }
 }

@@ -11,7 +11,7 @@ A serverless AWS application that emails a daily retirement countdown, complete
 with an AI-generated joke that gets progressively more unhinged as the date
 approaches. Built with AWS CDK (TypeScript).
 
-Every morning at 07:00 UTC, a Lambda function calculates the number of
+Every morning at 06:00 UTC, a Lambda function calculates the number of
 **working days** left until a configured retirement date, asks Amazon
 Bedrock (Claude) for a short joke matching the mood of that countdown
 stage, and emails the result via Amazon SES. Recent jokes are kept in
@@ -19,8 +19,9 @@ DynamoDB so the model avoids repeating itself, and a CloudWatch alarm
 emails a separate ops alert if a run fails.
 
 "Working days" excludes weekends, England & Wales bank holidays, the
-Christmas Day–New Year's Day closure period, and a fortnightly non-working
-Friday — see [docs/architecture.md](docs/architecture.md#working-day-calculation)
+Christmas Day–New Year's Day closure period, a fortnightly non-working
+Friday, and any booked holidays registered via the CLI below — see
+[docs/architecture.md](docs/architecture.md#working-day-calculation)
 for the exact rules.
 
 ## Architecture
@@ -46,9 +47,11 @@ for an AWS Well-Architected Framework review, and
 
 ```
 bin/retirement-countdown.ts        CDK app entry point + stack configuration
+bin/manage-holidays.ts             CLI to register/amend booked holidays (see below)
 lib/retirement-countdown-stack.ts  CDK stack: Lambda, EventBridge, DynamoDB, SES IAM, alarms
 lambda/handler.ts                  Lambda handler: countdown, Bedrock joke, SES send, DynamoDB history
 lambda/workingDays.ts              UK bank holidays, Christmas closure, fortnightly Friday, day counting
+lambda/holidays.ts                 Booked-holiday storage: add/remove/list against DynamoDB
 lambda/email.ts                    Countdown stage/tone, progress bar, HTML + text email rendering
 ```
 
@@ -99,6 +102,30 @@ or export them once as shell variables and reuse `-c retirementDate=$RETIREMENT_
 
 `countdownStartDate` is optional context (defaults to today) used only for
 the email's progress bar, not the working-day count.
+
+## Managing booked holidays
+
+Booked holidays are stored in their own DynamoDB table and excluded from
+the working-days count automatically — the Lambda reads them fresh on
+every run, so a change made via the CLI is picked up by the very next
+scheduled email. The CLI runs outside the Lambda, so it needs the table
+name and your own AWS credentials:
+
+```bash
+# One-time: find the table name from the stack output
+aws cloudformation describe-stacks --stack-name RetirementCountdownStack \
+  --query "Stacks[0].Outputs[?OutputKey=='BookedHolidaysTableName'].OutputValue" \
+  --output text
+
+export HOLIDAYS_TABLE_NAME=<value from above>
+export AWS_PROFILE=<your profile>   # or any other way of supplying credentials
+
+npx ts-node bin/manage-holidays.ts add 2026-09-01                 # single day
+npx ts-node bin/manage-holidays.ts range 2026-09-10 2026-09-14    # inclusive range
+npx ts-node bin/manage-holidays.ts remove 2026-09-01              # undo a single day
+npx ts-node bin/manage-holidays.ts remove-range 2026-09-10 2026-09-14
+npx ts-node bin/manage-holidays.ts list                           # all booked holidays
+```
 
 ## Run the tests
 
