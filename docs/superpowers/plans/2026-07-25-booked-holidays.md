@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status: Shipped.** All 6 tasks below were implemented, reviewed, and deployed. This document has been updated after the fact to match what's actually in the codebase — see "Post-ship fixes" at the bottom for what changed based on the final whole-branch review and a follow-up user request.
+
 **Goal:** Allow users to register and amend booked holidays so the working days remaining calculation excludes these dates.
 
 **Architecture:** Add a DynamoDB table to store booked holidays (individual dates or date ranges). Create a CLI tool to manage holidays and modify `workingDaysBetween()` to exclude booked holidays from the count. The Lambda handler loads holidays at runtime before calculating working days.
@@ -39,9 +41,11 @@
 - Modify: `lib/retirement-countdown-stack.ts` (after line 40, before the Lambda function)
 
 **Interfaces:**
-- Produces: DynamoDB table for storing holidays (name exposed via stack output)
+- Produces: DynamoDB table for storing holidays
 
-- [ ] **Step 1: Add holidays table to the CDK stack**
+> **Note (post-ship):** this task's original interface note said the table name would be "exposed via stack output," but no `CfnOutput` was actually added here — the CLI (Task 5) had no documented way to discover the table name until the final whole-branch review caught it as a Critical gap. See "Post-ship fixes" at the bottom.
+
+- [x] **Step 1: Add holidays table to the CDK stack**
 
 After the `jokeHistoryTable` definition (line 40), add:
 
@@ -54,7 +58,7 @@ const holidaysTable = new dynamodb.Table(this, "BookedHolidaysTable", {
 });
 ```
 
-- [ ] **Step 2: Grant Lambda read permissions on the holidays table**
+- [x] **Step 2: Grant Lambda read permissions on the holidays table**
 
 After granting permissions on `jokeHistoryTable` (line 59), add:
 
@@ -62,7 +66,7 @@ After granting permissions on `jokeHistoryTable` (line 59), add:
 holidaysTable.grantReadData(countdownFn);
 ```
 
-- [ ] **Step 3: Add table name to Lambda environment variables**
+- [x] **Step 3: Add table name to Lambda environment variables**
 
 In the `countdownFn` environment block (line 48-56), add:
 
@@ -70,7 +74,7 @@ In the `countdownFn` environment block (line 48-56), add:
 HOLIDAYS_TABLE_NAME: holidaysTable.tableName,
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add lib/retirement-countdown-stack.ts
@@ -93,7 +97,7 @@ git commit -m "feat: add DynamoDB table for booked holidays"
   - `addHolidayRange(startDate: string, endDate: string): Promise<void>` - Add date range
   - `listHolidays(): Promise<string[]>` - List all booked holidays (sorted ISO dates)
 
-- [ ] **Step 1: Create holidays.ts with DynamoDB operations**
+- [x] **Step 1: Create holidays.ts with DynamoDB operations**
 
 ```typescript
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -176,7 +180,7 @@ export async function listHolidays(): Promise<string[]> {
 }
 ```
 
-- [ ] **Step 2: Create holidays.test.ts**
+- [x] **Step 2: Create holidays.test.ts**
 
 ```typescript
 import { getBookedHolidays, addHoliday, addHolidayRange, listHolidays } from "./holidays";
@@ -218,7 +222,7 @@ describe("Holiday Management", () => {
 });
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add lambda/holidays.ts lambda/holidays.test.ts
@@ -237,7 +241,7 @@ git commit -m "feat: add holiday management functions"
 - Consumes: Nothing new
 - Produces: Updated `workingDaysBetween()` signature accepts optional `bookedHolidays?: Set<number>` parameter
 
-- [ ] **Step 1: Update workingDaysBetween signature**
+- [x] **Step 1: Update workingDaysBetween signature**
 
 Change line 106 from:
 
@@ -256,7 +260,7 @@ export function workingDaysBetween(
 ): number {
 ```
 
-- [ ] **Step 2: Update working day check to exclude booked holidays**
+- [x] **Step 2: Update working day check to exclude booked holidays**
 
 In the `workingDaysBetween` function (around line 116), change:
 
@@ -279,7 +283,7 @@ const isWorkingDay =
   !isNonWorkingFriday(cursor, nonWorkingFridayAnchor);
 ```
 
-- [ ] **Step 3: Update workingDaysUntilRetirement to accept booked holidays**
+- [x] **Step 3: Update workingDaysUntilRetirement to accept booked holidays**
 
 Change the function signature (around line 127-130) from:
 
@@ -302,7 +306,7 @@ export function workingDaysUntilRetirement(
 ): number {
 ```
 
-- [ ] **Step 4: Pass bookedHolidays to workingDaysBetween**
+- [x] **Step 4: Pass bookedHolidays to workingDaysBetween**
 
 In `workingDaysUntilRetirement`, change line 135 from:
 
@@ -316,7 +320,7 @@ to:
 return workingDaysBetween(target, from, anchor, bookedHolidays);
 ```
 
-- [ ] **Step 5: Add test for working days with booked holidays**
+- [x] **Step 5: Add test for working days with booked holidays**
 
 In `lambda/workingDays.test.ts`, after the existing tests, add:
 
@@ -355,7 +359,7 @@ describe("workingDaysBetween with booked holidays", () => {
 });
 ```
 
-- [ ] **Step 6: Run tests to verify**
+- [x] **Step 6: Run tests to verify**
 
 ```bash
 npm test lambda/workingDays.test.ts
@@ -363,7 +367,7 @@ npm test lambda/workingDays.test.ts
 
 Expected: All tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lambda/workingDays.ts lambda/workingDays.test.ts
@@ -381,7 +385,7 @@ git commit -m "feat: update workingDaysBetween to exclude booked holidays"
 - Consumes: `getBookedHolidays()` function, updated `workingDaysUntilRetirement()` signature
 - Produces: Handler now loads booked holidays before calculating days remaining
 
-- [ ] **Step 1: Import getBookedHolidays**
+- [x] **Step 1: Import getBookedHolidays**
 
 At the top of `lambda/handler.ts`, add to imports:
 
@@ -389,7 +393,7 @@ At the top of `lambda/handler.ts`, add to imports:
 import { getBookedHolidays } from "./holidays";
 ```
 
-- [ ] **Step 2: Update daysLeft function to accept and use booked holidays**
+- [x] **Step 2: Update daysLeft function to accept and use booked holidays**
 
 Change the `daysLeft()` function (line 22-24) from:
 
@@ -412,7 +416,7 @@ async function daysLeft(bookedHolidays: Set<number>): Promise<number> {
 }
 ```
 
-- [ ] **Step 3: Update handler to load and use booked holidays**
+- [x] **Step 3: Update handler to load and use booked holidays**
 
 Change the `handler()` function (line 96-103) from:
 
@@ -432,13 +436,12 @@ to:
 ```typescript
 export async function handler(): Promise<void> {
   const today = new Date();
-  const retirementDate = new Date(`${RETIREMENT_DATE}T00:00:00Z`);
-  
+
   const bookedHolidays = await getBookedHolidays(
     today.toISOString().slice(0, 10),
     RETIREMENT_DATE
   );
-  
+
   const days = await daysLeft(bookedHolidays);
   const recentJokes = await getRecentJokes();
   const joke = await generateJoke(days, recentJokes);
@@ -448,7 +451,9 @@ export async function handler(): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Commit**
+> **Note (post-ship):** the code block above has been edited from what actually shipped in the Task 4 commit — the original included an unused `const retirementDate = new Date(...)` line (dead code, flagged by the task reviewer as plan-mandated). It was removed in a follow-up fix commit (`ac3ffc6`) after the user chose to strip it. See "Post-ship fixes" at the bottom.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add lambda/handler.ts
@@ -466,7 +471,9 @@ git commit -m "feat: load booked holidays in handler before calculating working 
 - Consumes: Holiday management functions from `lambda/holidays.ts`
 - Produces: CLI tool with `add`, `range`, `list` commands
 
-- [ ] **Step 1: Create manage-holidays.ts CLI tool**
+> **Note (post-ship):** the code block below is the original `add`/`range`/`list`-only version from Task 5's commit (`c5af967`). It does not include `remove`/`remove-range` — those were added afterward in a separate follow-up commit (`fe365b5`) after the user pointed out that "register **and amend**" (the original feature request) has no removal path without them. See "Post-ship fixes" at the bottom for the current, complete CLI.
+
+- [x] **Step 1: Create manage-holidays.ts CLI tool**
 
 ```typescript
 import { addHoliday, addHolidayRange, listHolidays } from "../lambda/holidays";
@@ -529,7 +536,7 @@ async function main() {
 main();
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add bin/manage-holidays.ts
@@ -544,7 +551,7 @@ git commit -m "feat: add CLI tool for managing booked holidays"
 - Run tests and build
 - Deploy CDK stack
 
-- [ ] **Step 1: Run all tests**
+- [x] **Step 1: Run all tests**
 
 ```bash
 npm test
@@ -552,7 +559,7 @@ npm test
 
 Expected: All tests pass (40+ tests).
 
-- [ ] **Step 2: Build TypeScript**
+- [x] **Step 2: Build TypeScript**
 
 ```bash
 npm run build
@@ -560,7 +567,7 @@ npm run build
 
 Expected: No compilation errors.
 
-- [ ] **Step 3: Deploy CDK stack**
+- [x] **Step 3: Deploy CDK stack**
 
 ```bash
 AWS_PROFILE=lza-management npm run cdk -- deploy --require-approval never \
@@ -572,7 +579,7 @@ AWS_PROFILE=lza-management npm run cdk -- deploy --require-approval never \
 
 Expected: Stack deployment succeeds.
 
-- [ ] **Step 4: Test CLI tool locally (optional smoke test)**
+- [x] **Step 4: Test CLI tool locally (optional smoke test)**
 
 ```bash
 AWS_PROFILE=lza-management npx ts-node bin/manage-holidays.ts list
@@ -580,14 +587,14 @@ AWS_PROFILE=lza-management npx ts-node bin/manage-holidays.ts list
 
 Expected: Shows "No booked holidays." or lists existing holidays.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add -A
 git commit -m "feat: add booked holidays feature with CLI management"
 ```
 
-- [ ] **Step 6: Push to remote**
+- [x] **Step 6: Push to remote**
 
 ```bash
 git push origin main
@@ -605,4 +612,64 @@ git push origin main
 | 4 | `lambda/handler.ts` | Load holidays at runtime | Functional test |
 | 5 | `bin/manage-holidays.ts` | CLI for managing holidays | Manual CLI test |
 | 6 | Integration | Build, test, deploy | Full deployment |
+
+---
+
+## Post-ship fixes
+
+After Task 6, a final whole-branch review (Opus, covering `37610d4..c5af967`) and a follow-up user request added work beyond the original 6 tasks:
+
+**1. Dead code removed from Task 4** (commit `ac3ffc6`) — the task reviewer flagged `const retirementDate = ...` in `handler()` as unused, plan-mandated dead code. The user chose to strip it; a fix subagent removed the line, re-ran the full suite (46/46 pass), and the task reviewer re-approved.
+
+**2. Table name exposed via CfnOutput** (commit `636fc3b`) — the final review found this as **Critical**: `bin/manage-holidays.ts` reads `HOLIDAYS_TABLE_NAME` from the environment, but nothing set that variable outside the Lambda, and the table had no `CfnOutput`, so there was no documented way for a human to discover its name. Added:
+
+```typescript
+new cdk.CfnOutput(this, "BookedHolidaysTableName", {
+  value: holidaysTable.tableName,
+});
+```
+
+**3. README updated** (commit `636fc3b`) — added a "Managing booked holidays" section with the table-discovery command and full CLI usage, updated the project-layout table to list `bin/manage-holidays.ts` and `lambda/holidays.ts`, and corrected a stale "07:00 UTC" schedule reference (actual schedule is 06:00 UTC).
+
+**4. `remove`/`remove-range` commands added** (commit `fe365b5`) — the final review's Important finding: the original feature request was "register **and amend** booked holidays," but Task 5 only ever specified `add`/`range`/`list`, with no way to undo a booking. Added to `lambda/holidays.ts`:
+
+```typescript
+/** Remove a single booked holiday */
+export async function removeHoliday(date: string): Promise<void> {
+  await ddb.send(
+    new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: { type: "holiday", date },
+    })
+  );
+}
+
+/** Remove a range of booked holidays (inclusive) */
+export async function removeHolidayRange(startDate: string, endDate: string): Promise<void> {
+  let current = parseIsoDateUtc(startDate);
+  const end = parseIsoDateUtc(endDate);
+
+  while (current.getTime() <= end.getTime()) {
+    const iso = dateToIso(current);
+    await ddb.send(
+      new DeleteCommand({
+        TableName: TABLE_NAME,
+        Key: { type: "holiday", date: iso },
+      })
+    );
+    current = addDays(current, 1);
+  }
+}
+```
+
+And in `bin/manage-holidays.ts`, mirroring the `add`/`range` commands:
+
+```
+npx ts-node bin/manage-holidays.ts remove <date>              Remove a single holiday (YYYY-MM-DD)
+npx ts-node bin/manage-holidays.ts remove-range <from> <to>   Remove a holiday range (inclusive)
+```
+
+This also required swapping the now-unused `GetCommand` import in `lambda/holidays.ts` for `DeleteCommand` (the original `GetCommand` import was dead code from the start — flagged as Minor in Task 2's review and never actually used).
+
+**Final commit count:** 8 commits (`b25158e` through `636fc3b`), all on `main`, all pushed to `origin/main`.
 
