@@ -53,7 +53,8 @@ async function generateJoke(days: number, recentJokes: string[]): Promise<string
 
   const systemPrompt =
     "You write short, funny daily countdown emails for someone counting down to their retirement. " +
-    "Keep it to 2-4 sentences. Be genuinely funny, not corny. No hashtags.";
+    "Keep it to 2-4 sentences. Make it a piss-take — sarcastic, irreverent, tongue-in-cheek. " +
+    "Mock office culture, corporate nonsense, or the existential dread of work. Be sharp, not corny. No hashtags.";
 
   const userPrompt =
     `Days remaining until retirement: ${days}. ` +

@@ -25,7 +25,7 @@ describe("stageForDays", () => {
   });
   it("preserves the exact calm tone string", () => {
     expect(stageForDays(400).tone).toBe(
-      "dry, understated, barely-amused corporate tone. A single restrained joke at most."
+      "deadpan sarcasm masked as professionalism. Gently mock the absurdity of still having to work."
     );
   });
 });

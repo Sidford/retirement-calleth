@@ -19,7 +19,7 @@ export interface Stage {
 const STAGES: Record<StageKey, Stage> = {
   calm: {
     key: "calm",
-    tone: "dry, understated, barely-amused corporate tone. A single restrained joke at most.",
+    tone: "deadpan sarcasm masked as professionalism. Gently mock the absurdity of still having to work.",
     emoji: "🗓️",
     accent: "#2563eb",
     gradient: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
@@ -28,7 +28,7 @@ const STAGES: Record<StageKey, Stage> = {
   },
   cheeky: {
     key: "cheeky",
-    tone: "noticeably cheekier, gentle countdown humor, a bit of a smirk.",
+    tone: "sarcastic and irreverent, snide remarks about work culture, sharp observational humor.",
     emoji: "😏",
     accent: "#0d9488",
     gradient: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
@@ -37,7 +37,7 @@ const STAGES: Record<StageKey, Stage> = {
   },
   unhinged: {
     key: "unhinged",
-    tone: "unhinged office-countdown energy, playful exaggeration, mock-desperate.",
+    tone: "cynical and escalating, ranting about meetings and corporate nonsense, mock-desperate longing.",
     emoji: "🤪",
     accent: "#d97706",
     gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
@@ -46,7 +46,7 @@ const STAGES: Record<StageKey, Stage> = {
   },
   chaotic: {
     key: "chaotic",
-    tone: "chaotic, escalating absurdity, all-caps and exclamation marks welcome.",
+    tone: "UNHINGED RAGE AGAINST THE MACHINE, frantic countdown energy, mocking the final death throes of work.",
     emoji: "🔥",
     accent: "#ea580c",
     gradient: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
@@ -55,7 +55,7 @@ const STAGES: Record<StageKey, Stage> = {
   },
   peak: {
     key: "peak",
-    tone: "peak celebratory chaos, over-the-top excitement, confetti-emoji energy.",
+    tone: "MANIC CELEBRATION mixed with spite, giddy contempt for the job you're leaving, FREEDOM IS NIGH.",
     emoji: "🎉",
     accent: "#db2777",
     gradient: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
@@ -64,7 +64,7 @@ const STAGES: Record<StageKey, Stage> = {
   },
   theday: {
     key: "theday",
-    tone: "today is the day — triumphant, warm, a little emotional, congratulatory.",
+    tone: "TODAY IS THE DAY — triumphant vindication, you made it out alive, the corporate overlords cannot touch you now.",
     emoji: "🥳",
     accent: "#f59e0b",
     gradient: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
