@@ -58,12 +58,12 @@ describe("renderEmail", () => {
   it("far-off email: hero number, joke, progress, plain subject", () => {
     const stage = stageForDays(621);
     const out = renderEmail({ days: 621, joke: "Only 621 sleeps left.", stage, pct: 43 });
-    expect(out.subject).toBe("🗓️ 621 days to go");
+    expect(out.subject).toBe("🗓️ 621 working days to go");
     expect(out.html).toContain("621");
     expect(out.html).toContain("Only 621 sleeps left.");
     expect(out.html).toContain("43% of the way there");
     expect(out.html).toContain(stage.accent);
-    expect(out.text).toContain("621 days until retirement");
+    expect(out.text).toContain("621 working days until retirement");
     expect(out.text).toContain("Only 621 sleeps left.");
     expect(out.text).toContain("— your retirement countdown bot");
   });
@@ -71,7 +71,7 @@ describe("renderEmail", () => {
   it("final-week email: ALL-CAPS subject with bangs", () => {
     const stage = stageForDays(3);
     const out = renderEmail({ days: 3, joke: "Three. More. Days.", stage, pct: 98 });
-    expect(out.subject).toBe("🎉 3 DAYS TO GO!!!");
+    expect(out.subject).toBe("🎉 3 WORKING DAYS TO GO!!!");
   });
 
   it("the day: celebratory subject and heading", () => {
@@ -95,13 +95,13 @@ describe("renderEmail", () => {
   it("uses singular unit for one day", () => {
     const stage = stageForDays(1);
     const out = renderEmail({ days: 1, joke: "!", stage, pct: 99 });
-    expect(out.subject).toBe("🎉 1 DAY TO GO!!!");
+    expect(out.subject).toBe("🎉 1 WORKING DAY TO GO!!!");
   });
 
   it("uses singular subheading label in the HTML for one day", () => {
     const stage = stageForDays(1);
     const out = renderEmail({ days: 1, joke: "!", stage, pct: 99 });
-    expect(out.html).toContain(">day to go<");
-    expect(out.html).not.toContain("days to go");
+    expect(out.html).toContain(">working day to go<");
+    expect(out.html).not.toContain("working days to go");
   });
 });

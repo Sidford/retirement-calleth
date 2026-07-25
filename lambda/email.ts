@@ -121,7 +121,7 @@ function escapeHtml(s: string): string {
 }
 
 export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEmail {
-  const unit = days === 1 ? "day" : "days";
+  const unit = days === 1 ? "working day" : "working days";
 
   let subject: string;
   if (stage.key === "theday") {
