@@ -2,7 +2,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedroc
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { stageForDays, progressPct, renderEmail } from "./email";
+import { stageForDays, progressPct, fucksToGivePct, renderEmail } from "./email";
 import { workingDaysUntilRetirement } from "./workingDays";
 import { getBookedHolidays } from "./holidays";
 
@@ -51,6 +51,7 @@ async function saveJoke(joke: string, recent: string[]): Promise<void> {
 
 async function generateJoke(days: number, recentJokes: string[]): Promise<string> {
   const tone = stageForDays(days).tone;
+  const fucksPct = fucksToGivePct(days);
   const avoid = recentJokes.length
     ? `Avoid repeating the style or punchline of these recent messages:\n${recentJokes
         .map((j) => `- ${j}`)
@@ -64,7 +65,10 @@ async function generateJoke(days: number, recentJokes: string[]): Promise<string
 
   const userPrompt =
     `Days remaining until retirement: ${days}. ` +
-    `Tone for today: ${tone} ${avoid}`;
+    `Tone for today: ${tone} ` +
+    `The user also has a "F**ks left to give" meter reading ${fucksPct}%, tracking how much they still care about doing a good job — ` +
+    `it starts near 100% (still trying, still giving a damn) and craters toward 0% as retirement approaches (checked out, running on autopilot, ` +
+    `can no longer be bothered pretending to care). Let the joke's attitude reflect where that meter currently sits, on top of the tone above. ${avoid}`;
 
   const command = new InvokeModelCommand({
     modelId: BEDROCK_MODEL_ID,

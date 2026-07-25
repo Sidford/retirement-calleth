@@ -82,6 +82,18 @@ export function stageForDays(n: number): Stage {
   return STAGES.theday;
 }
 
+// Exponential saturation curve: sits near 100% while retirement is hundreds
+// of days out, then craters through the final weeks as `days` shrinks toward
+// zero (e.g. ~96% at 100 days, ~63% at 30, ~21% at 7, ~3% at 1, 0% on the day).
+// FUCKS_DECAY_CONSTANT controls how sharply the crash concentrates near the end.
+const FUCKS_DECAY_CONSTANT = 30;
+
+export function fucksToGivePct(days: number): number {
+  if (days <= 0) return 0;
+  const pct = 100 * (1 - Math.exp(-days / FUCKS_DECAY_CONSTANT));
+  return Math.max(0, Math.min(100, Math.round(pct)));
+}
+
 export function progressPct(
   startISO: string,
   retirementISO: string,
@@ -106,6 +118,8 @@ export interface RenderInput {
   pct: number;
 }
 
+const FUCKS_METER_COLOR = "#dc2626";
+
 export interface RenderedEmail {
   subject: string;
   html: string;
@@ -122,6 +136,7 @@ function escapeHtml(s: string): string {
 
 export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEmail {
   const unit = days === 1 ? "working day" : "working days";
+  const fucksPct = fucksToGivePct(days);
 
   let subject: string;
   if (stage.key === "theday") {
@@ -153,6 +168,7 @@ export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEm
     `"${joke}"`,
     "",
     `${pct}% of the way there`,
+    `${fucksPct}% F**ks left to give`,
     "",
     "— your retirement countdown bot",
   ].join("\n");
@@ -184,6 +200,18 @@ export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEm
               </td></tr>
             </table>
             <div style="font-size:13px;color:#64748b;margin-top:8px;text-align:right;">${pct}% of the way there</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px 28px 28px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;border-radius:999px;">
+              <tr><td style="padding:0;">
+                <table role="presentation" width="${fucksPct}%" cellpadding="0" cellspacing="0">
+                  <tr><td style="background:${FUCKS_METER_COLOR};height:12px;border-radius:999px;font-size:0;line-height:0;">&nbsp;</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="font-size:13px;color:#64748b;margin-top:8px;text-align:right;">${fucksPct}% F**ks left to give</div>
           </td>
         </tr>
         <tr>
