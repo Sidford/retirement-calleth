@@ -102,7 +102,6 @@ async function sendEmail(days: number, joke: string): Promise<void> {
 
 export async function handler(): Promise<void> {
   const today = new Date();
-  const retirementDate = new Date(`${RETIREMENT_DATE}T00:00:00Z`);
 
   const bookedHolidays = await getBookedHolidays(
     today.toISOString().slice(0, 10),
