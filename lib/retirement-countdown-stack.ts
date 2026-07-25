@@ -94,10 +94,10 @@ export class RetirementCountdownStack extends cdk.Stack {
       })
     );
 
-    // Daily trigger — 07:00 UTC. Adjust manually across BST/GMT if exact
+    // Daily trigger — 06:00 UTC. Adjust manually across BST/GMT if exact
     // local time matters year-round; EventBridge cron does not shift for DST.
     const rule = new events.Rule(this, "DailyScheduleRule", {
-      schedule: events.Schedule.cron({ minute: "0", hour: "7" }),
+      schedule: events.Schedule.cron({ minute: "0", hour: "6" }),
     });
     rule.addTarget(new targets.LambdaFunction(countdownFn));
 
