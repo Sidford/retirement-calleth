@@ -126,6 +126,39 @@ describe("workingDaysBetween", () => {
   });
 });
 
+describe("workingDaysBetween with booked holidays", () => {
+  it("excludes booked holidays from working days count", () => {
+    const from = new Date("2026-08-01T00:00:00Z");
+    const target = new Date("2026-08-10T00:00:00Z"); // 10 days
+    const anchor = new Date("2025-07-18T00:00:00Z");
+
+    // Without holidays
+    const withoutHolidays = workingDaysBetween(target, from, anchor);
+
+    // With one business day as holiday
+    const bookedHolidays = new Set([new Date("2026-08-05T00:00:00Z").getTime()]);
+    const withHolidays = workingDaysBetween(target, from, anchor, bookedHolidays);
+
+    expect(withHolidays).toBe(withoutHolidays - 1);
+  });
+
+  it("excludes holiday ranges from working days count", () => {
+    const from = new Date("2026-08-01T00:00:00Z");
+    const target = new Date("2026-08-10T00:00:00Z");
+    const anchor = new Date("2025-07-18T00:00:00Z");
+
+    const bookedHolidays = new Set([
+      new Date("2026-08-05T00:00:00Z").getTime(),
+      new Date("2026-08-06T00:00:00Z").getTime(),
+      new Date("2026-08-07T00:00:00Z").getTime(),
+    ]);
+    const withHolidays = workingDaysBetween(target, from, anchor, bookedHolidays);
+    const withoutHolidays = workingDaysBetween(target, from, anchor);
+
+    expect(withHolidays).toBe(withoutHolidays - 3);
+  });
+});
+
 describe("workingDaysUntilRetirement", () => {
   it("wires today/target/anchor strings through to workingDaysBetween", () => {
     const result = workingDaysUntilRetirement(

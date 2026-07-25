@@ -103,7 +103,12 @@ export function isNonWorkingFriday(date: Date, anchor: Date): boolean {
 }
 
 /** Counts working days strictly after `from` up to and including `target`. */
-export function workingDaysBetween(target: Date, from: Date, nonWorkingFridayAnchor: Date): number {
+export function workingDaysBetween(
+  target: Date,
+  from: Date,
+  nonWorkingFridayAnchor: Date,
+  bookedHolidays: Set<number> = new Set()
+): number {
   if (target.getTime() <= from.getTime()) return 0;
 
   const holidays = new Set<number>();
@@ -117,6 +122,7 @@ export function workingDaysBetween(target: Date, from: Date, nonWorkingFridayAnc
       !isWeekend(cursor) &&
       !isChristmasClosure(cursor) &&
       !holidays.has(cursor.getTime()) &&
+      !bookedHolidays.has(cursor.getTime()) &&
       !isNonWorkingFriday(cursor, nonWorkingFridayAnchor);
     if (isWorkingDay) count++;
   }
@@ -127,10 +133,11 @@ export function workingDaysBetween(target: Date, from: Date, nonWorkingFridayAnc
 export function workingDaysUntilRetirement(
   retirementDateIso: string,
   nonWorkingFridayAnchorIso: string,
-  today: Date = new Date()
+  today: Date = new Date(),
+  bookedHolidays: Set<number> = new Set()
 ): number {
   const from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
   const target = parseIsoDateUtc(retirementDateIso);
   const anchor = parseIsoDateUtc(nonWorkingFridayAnchorIso);
-  return workingDaysBetween(target, from, anchor);
+  return workingDaysBetween(target, from, anchor, bookedHolidays);
 }
