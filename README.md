@@ -27,6 +27,12 @@ see `fucksToGivePct` in [lambda/email.ts](lambda/email.ts) — and its current
 reading is also fed into the Bedrock prompt so the joke's attitude can track
 it alongside the existing countdown-stage tone.
 
+The email's headline leads with a calendar-based countdown — **N months,
+D days to go** — computed from today's date to the retirement date via
+`monthsAndDaysUntil` in [lambda/email.ts](lambda/email.ts). The working-days
+count (which still drives the mood stage and the F**ks-to-Give meter) is
+shown underneath as a secondary line.
+
 "Working days" excludes weekends, England & Wales bank holidays, the
 Christmas Day–New Year's Day closure period, a fortnightly non-working
 Friday, and any booked holidays registered via the CLI below — see
@@ -146,8 +152,8 @@ Covers the working-day calculation (`lambda/workingDays.ts`: UK bank
 holidays, Christmas closure, the fortnightly Friday, booked holidays, day
 counting), booked-holiday storage (`lambda/holidays.ts`: add/remove/list
 against a mocked DynamoDB table), and email rendering (`lambda/email.ts`:
-stage/tone selection, progress bar, the F**ks-to-Give meter, HTML/text
-output).
+stage/tone selection, progress bar, the F**ks-to-Give meter, the calendar
+months/days countdown, HTML/text output).
 
 ## Test it immediately
 

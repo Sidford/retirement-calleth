@@ -2,7 +2,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedroc
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { stageForDays, progressPct, fucksToGivePct, renderEmail } from "./email";
+import { stageForDays, progressPct, fucksToGivePct, renderEmail, monthsAndDaysUntil, monthsDaysPhrase } from "./email";
 import { workingDaysUntilRetirement } from "./workingDays";
 import { getBookedHolidays } from "./holidays";
 
@@ -49,7 +49,12 @@ async function saveJoke(joke: string, recent: string[]): Promise<void> {
   );
 }
 
-async function generateJoke(days: number, recentJokes: string[]): Promise<string> {
+async function generateJoke(
+  days: number,
+  monthsRemaining: number,
+  daysRemainder: number,
+  recentJokes: string[]
+): Promise<string> {
   const tone = stageForDays(days).tone;
   const fucksPct = fucksToGivePct(days);
   const avoid = recentJokes.length
@@ -64,7 +69,8 @@ async function generateJoke(days: number, recentJokes: string[]): Promise<string
     "Mock office culture, corporate nonsense, or the existential dread of work. Be sharp, not corny. No hashtags.";
 
   const userPrompt =
-    `Days remaining until retirement: ${days}. ` +
+    `Working days remaining until retirement: ${days}. ` +
+    `On the calendar (weekends and holidays included), that's ${monthsDaysPhrase(monthsRemaining, daysRemainder)} left. ` +
     `Tone for today: ${tone} ` +
     `The user also has a "F**ks left to give" meter reading ${fucksPct}%, tracking how much they still care about doing a good job — ` +
     `it starts near 100% (still trying, still giving a damn) and craters toward 0% as retirement approaches (checked out, running on autopilot, ` +
@@ -87,10 +93,15 @@ async function generateJoke(days: number, recentJokes: string[]): Promise<string
   return payload.content?.[0]?.text?.trim() ?? "Countdown joke generator took the day off.";
 }
 
-async function sendEmail(days: number, joke: string): Promise<void> {
+async function sendEmail(
+  days: number,
+  monthsRemaining: number,
+  daysRemainder: number,
+  joke: string
+): Promise<void> {
   const stage = stageForDays(days);
   const pct = progressPct(COUNTDOWN_START_DATE, RETIREMENT_DATE, new Date());
-  const { subject, html, text } = renderEmail({ days, joke, stage, pct });
+  const { subject, html, text } = renderEmail({ days, joke, stage, pct, monthsRemaining, daysRemainder });
 
   await ses.send(
     new SendEmailCommand({
@@ -106,16 +117,15 @@ async function sendEmail(days: number, joke: string): Promise<void> {
 
 export async function handler(): Promise<void> {
   const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
 
-  const bookedHolidays = await getBookedHolidays(
-    today.toISOString().slice(0, 10),
-    RETIREMENT_DATE
-  );
+  const bookedHolidays = await getBookedHolidays(todayIso, RETIREMENT_DATE);
 
   const days = await daysLeft(bookedHolidays);
+  const { months: monthsRemaining, days: daysRemainder } = monthsAndDaysUntil(todayIso, RETIREMENT_DATE);
   const recentJokes = await getRecentJokes();
-  const joke = await generateJoke(days, recentJokes);
+  const joke = await generateJoke(days, monthsRemaining, daysRemainder, recentJokes);
 
-  await sendEmail(days, joke);
+  await sendEmail(days, monthsRemaining, daysRemainder, joke);
   await saveJoke(joke, recentJokes);
 }
