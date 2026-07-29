@@ -95,6 +95,9 @@ describe("monthsAndDaysUntil", () => {
   it("borrows the correct day count from the preceding month, including across a leap-year February", () => {
     expect(monthsAndDaysUntil("2028-02-15", "2028-03-10")).toEqual({ months: 0, days: 24 });
   });
+  it("borrows across more than one short month when the start day is late in its month", () => {
+    expect(monthsAndDaysUntil("2026-01-31", "2026-03-01")).toEqual({ months: 0, days: 29 });
+  });
   it("returns days only within the same calendar month", () => {
     expect(monthsAndDaysUntil("2026-06-01", "2026-06-20")).toEqual({ months: 0, days: 19 });
   });

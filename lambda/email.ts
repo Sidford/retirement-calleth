@@ -123,9 +123,16 @@ export function monthsAndDaysUntil(fromISO: string, toISO: string): { months: nu
   let months = (to.year - from.year) * 12 + (to.month - from.month);
   let days = to.day - from.day;
 
-  if (days < 0) {
+  let borrowMonth = to.month;
+  let borrowYear = to.year;
+  while (days < 0) {
     months -= 1;
-    days += new Date(Date.UTC(to.year, to.month, 0)).getUTCDate();
+    borrowMonth -= 1;
+    if (borrowMonth < 0) {
+      borrowMonth = 11;
+      borrowYear -= 1;
+    }
+    days += new Date(Date.UTC(borrowYear, borrowMonth + 1, 0)).getUTCDate();
   }
 
   if (months < 0) {

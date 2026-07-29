@@ -69,8 +69,8 @@ async function generateJoke(
     "Mock office culture, corporate nonsense, or the existential dread of work. Be sharp, not corny. No hashtags.";
 
   const userPrompt =
-    `Days remaining until retirement: ${days}. ` +
-    `On the calendar, that's ${monthsDaysPhrase(monthsRemaining, daysRemainder)} left. ` +
+    `Working days remaining until retirement: ${days}. ` +
+    `On the calendar (weekends and holidays included), that's ${monthsDaysPhrase(monthsRemaining, daysRemainder)} left. ` +
     `Tone for today: ${tone} ` +
     `The user also has a "F**ks left to give" meter reading ${fucksPct}%, tracking how much they still care about doing a good job — ` +
     `it starts near 100% (still trying, still giving a damn) and craters toward 0% as retirement approaches (checked out, running on autopilot, ` +
