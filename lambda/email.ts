@@ -111,6 +111,30 @@ export function progressPct(
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
+function parseIsoParts(iso: string): { year: number; month: number; day: number } {
+  const [year, month, day] = iso.split("-").map(Number);
+  return { year, month: month - 1, day };
+}
+
+export function monthsAndDaysUntil(fromISO: string, toISO: string): { months: number; days: number } {
+  const from = parseIsoParts(fromISO);
+  const to = parseIsoParts(toISO);
+
+  let months = (to.year - from.year) * 12 + (to.month - from.month);
+  let days = to.day - from.day;
+
+  if (days < 0) {
+    months -= 1;
+    days += new Date(Date.UTC(to.year, to.month, 0)).getUTCDate();
+  }
+
+  if (months < 0) {
+    return { months: 0, days: 0 };
+  }
+
+  return { months, days };
+}
+
 export interface RenderInput {
   days: number;
   joke: string;

@@ -1,4 +1,4 @@
-import { stageForDays, progressPct, fucksToGivePct, renderEmail } from "./email";
+import { stageForDays, progressPct, monthsAndDaysUntil, fucksToGivePct, renderEmail } from "./email";
 
 describe("stageForDays", () => {
   it("returns calm above 365 days", () => {
@@ -82,6 +82,27 @@ describe("progressPct", () => {
   });
   it("returns 0 when start is not before retirement", () => {
     expect(progressPct("2028-01-01", "2026-01-01", new Date("2027-01-01T00:00:00Z"))).toBe(0);
+  });
+});
+
+describe("monthsAndDaysUntil", () => {
+  it("returns a whole number of months with no leftover days", () => {
+    expect(monthsAndDaysUntil("2026-01-15", "2026-07-15")).toEqual({ months: 6, days: 0 });
+  });
+  it("returns months plus leftover days", () => {
+    expect(monthsAndDaysUntil("2026-01-15", "2026-07-27")).toEqual({ months: 6, days: 12 });
+  });
+  it("borrows the correct day count from the preceding month, including across a leap-year February", () => {
+    expect(monthsAndDaysUntil("2028-02-15", "2028-03-10")).toEqual({ months: 0, days: 24 });
+  });
+  it("returns days only within the same calendar month", () => {
+    expect(monthsAndDaysUntil("2026-06-01", "2026-06-20")).toEqual({ months: 0, days: 19 });
+  });
+  it("returns zero for the same day", () => {
+    expect(monthsAndDaysUntil("2026-06-01", "2026-06-01")).toEqual({ months: 0, days: 0 });
+  });
+  it("clamps to zero when the target date is not after the start date", () => {
+    expect(monthsAndDaysUntil("2026-07-01", "2026-06-01")).toEqual({ months: 0, days: 0 });
   });
 });
 
