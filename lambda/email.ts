@@ -140,6 +140,8 @@ export interface RenderInput {
   joke: string;
   stage: Stage;
   pct: number;
+  monthsRemaining: number;
+  daysRemainder: number;
 }
 
 const FUCKS_METER_COLOR = "#dc2626";
@@ -158,7 +160,40 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEmail {
+function monthWord(n: number): string {
+  return n === 1 ? "month" : "months";
+}
+
+function dayWord(n: number): string {
+  return n === 1 ? "day" : "days";
+}
+
+export function monthsDaysPhrase(months: number, days: number): string {
+  if (months > 0) {
+    return days > 0
+      ? `${months} ${monthWord(months)}, ${days} ${dayWord(days)}`
+      : `${months} ${monthWord(months)}`;
+  }
+  return `${days} ${dayWord(days)}`;
+}
+
+function heroSubheading(months: number, days: number): string {
+  if (months > 0) {
+    return days > 0
+      ? `${monthWord(months)}, ${days} ${dayWord(days)} to go`
+      : `${monthWord(months)} to go`;
+  }
+  return `${dayWord(days)} to go`;
+}
+
+export function renderEmail({
+  days,
+  joke,
+  stage,
+  pct,
+  monthsRemaining,
+  daysRemainder,
+}: RenderInput): RenderedEmail {
   const unit = days === 1 ? "working day" : "working days";
   const fucksPct = fucksToGivePct(days);
 
@@ -172,22 +207,27 @@ export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEm
       : `${stage.subjectPrefix} ${core}`;
   }
 
+  const heroNumber = monthsRemaining > 0 ? monthsRemaining : daysRemainder;
   const heading =
     stage.key === "theday"
       ? `TODAY'S THE DAY ${stage.emoji}`
-      : `${days} ${stage.emoji}`;
+      : `${heroNumber} ${stage.emoji}`;
   const subheading =
-    stage.key === "theday" ? "Congratulations — you made it." : `${unit} to go`;
+    stage.key === "theday"
+      ? "Congratulations — you made it."
+      : heroSubheading(monthsRemaining, daysRemainder);
   // The short stage labels ("day to go") read well in caps; the celebratory
   // sentence does not, so only the label stages get the uppercase treatment.
   const subheadingTransform = stage.key === "theday" ? "none" : "uppercase";
 
   const safeJoke = escapeHtml(joke);
+  const workingDaysCaption = `${days} ${unit} to go`;
 
   const text = [
     stage.key === "theday"
       ? `TODAY'S THE DAY! ${stage.emoji}`
-      : `${days} ${unit} until retirement`,
+      : `${monthsDaysPhrase(monthsRemaining, daysRemainder)} until retirement`,
+    ...(stage.key === "theday" ? [] : [workingDaysCaption]),
     "",
     `"${joke}"`,
     "",
@@ -196,6 +236,13 @@ export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEm
     "",
     "— your retirement countdown bot",
   ].join("\n");
+
+  const captionRow =
+    stage.key === "theday"
+      ? ""
+      : `<tr>
+          <td align="center" style="padding:16px 28px 0 28px;font-size:14px;color:#64748b;">${workingDaysCaption}</td>
+        </tr>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -209,6 +256,7 @@ export function renderEmail({ days, joke, stage, pct }: RenderInput): RenderedEm
             <div style="font-size:16px;color:#ffffff;opacity:0.9;margin-top:8px;letter-spacing:1px;text-transform:${subheadingTransform};">${subheading}</div>
           </td>
         </tr>
+        ${captionRow}
         <tr>
           <td style="padding:28px 28px 8px 28px;">
             <div style="border-left:4px solid ${stage.accent};background:#f8fafc;border-radius:8px;padding:16px 18px;font-size:18px;line-height:1.5;color:#0f172a;">${safeJoke}</div>
